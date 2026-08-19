@@ -25,7 +25,7 @@ jobs:
       - run: pnpm run build
       # base_url等の出力を使っていない（vite.config.tsでbaseを固定済み）ため
       # configure-pages は呼ばない。build ジョブに pages 権限を持たせずに済む。
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 

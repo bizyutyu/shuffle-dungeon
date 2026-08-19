@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { BootScene } from '@/scenes/BootScene';
+import { RunScene } from '@/scenes/RunScene';
+import { HudScene } from '@/scenes/HudScene';
 
 export const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -14,5 +16,5 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
   render: { antialias: false, pixelArt: true, roundPixels: true },
   physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 0 }, debug: false } },
   input: { activePointers: 2 },
-  scene: [BootScene],
+  scene: [BootScene, RunScene, HudScene],
 };

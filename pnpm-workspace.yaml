@@ -1,0 +1,17 @@
+# サプライチェーン対策: 公開されたばかりのバージョンを自動採用しない。
+# メンテナのアカウント乗っ取りによる汚染バージョン公開は、多くの場合
+# 数時間〜数日でyankされるため、猶予期間を置くだけで回避できる。
+minimumReleaseAge: 1440 # 24時間 (分単位)
+
+# 上記ポリシーの例外。dependabot がバージョンを上げるとバージョン指定が
+# ずれて対象外になり得るので、pnpm install が minimumReleaseAge で
+# 止まったら値を最新に更新すること。全てdevDependency（本番バンドル非対象）。
+minimumReleaseAgeExclude:
+  - '@vitest/expect@4.1.11'
+  - '@vitest/mocker@4.1.11'
+  - '@vitest/pretty-format@4.1.11'
+  - '@vitest/runner@4.1.11'
+  - '@vitest/snapshot@4.1.11'
+  - '@vitest/spy@4.1.11'
+  - '@vitest/utils@4.1.11'
+  - vitest@4.1.11

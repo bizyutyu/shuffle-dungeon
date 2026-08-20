@@ -1,11 +1,33 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath, URL } from 'node:url';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   base: '/shuffle-dungeon/', // GitHub Pages のサブパス
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  plugins: [
+    VitePWA({
+      // Workboxのビルド済みSWをそのまま使う（自前SWは書かない）
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg'],
+      manifest: {
+        id: '/shuffle-dungeon/',
+        name: 'シャッフル・ダンジョン',
+        short_name: 'シャッフル・ダンジョン',
+        description: '因果律崩壊型・5分サクッとローグライクRPG',
+        lang: 'ja',
+        theme_color: '#0b0b10',
+        background_color: '#0b0b10',
+        display: 'standalone',
+        start_url: '/shuffle-dungeon/',
+        scope: '/shuffle-dungeon/',
+        // 本格的なPNG/maskableアイコンはグラフィック素材調達時に差し替える
+        icons: [{ src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+      },
+    }),
+  ],
   server: { port: 5173 }, // LAN 公開が必要なときは `pnpm dev:host`
   build: {
     target: 'es2022',

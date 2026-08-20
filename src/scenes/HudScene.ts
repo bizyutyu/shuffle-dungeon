@@ -66,11 +66,7 @@ export class HudScene extends Phaser.Scene {
     this.floorText.setText(`F${this.ctx.state.floor}/5`);
     this.hpText.setText(`${Math.ceil(this.ctx.state.playerHp)}/${this.ctx.state.playerMaxHp}`);
 
-    const hpRatio = Phaser.Math.Clamp(
-      this.ctx.state.playerHp / this.ctx.state.playerMaxHp,
-      0,
-      1,
-    );
+    const hpRatio = Phaser.Math.Clamp(this.ctx.state.playerHp / this.ctx.state.playerMaxHp, 0, 1);
     this.hpBarFill.width = HP_BAR_WIDTH * hpRatio;
     this.hpBarFill.setFillStyle(hpRatio > 0.5 ? 0x30d158 : hpRatio > 0.25 ? 0xffcc00 : 0xff3b30);
 

@@ -3,9 +3,11 @@ import type { EnemyState } from '@/core/types';
 export interface EnemyDef {
   hp: number;
   atk: number;
+  /** Phaser側でロードした画像のアセットキー。core自体はPhaserに依存しない単なる文字列データ。 */
+  spriteKey: string;
 }
 
-export const BASE_ENEMY: EnemyDef = { hp: 30, atk: 6 };
+export const BASE_ENEMY: EnemyDef = { hp: 30, atk: 6, spriteKey: 'enemy-zombie' };
 
 export function createEnemy(
   id: string,
@@ -18,6 +20,7 @@ export function createEnemy(
     hp: def.hp,
     maxHp: def.hp,
     atk: def.atk,
+    spriteKey: def.spriteKey,
     x,
     y,
     alive: true,

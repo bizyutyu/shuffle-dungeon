@@ -59,6 +59,7 @@ export class RelicPickScene extends Phaser.Scene {
         .setOrigin(0.5);
 
       card.on('pointerdown', () => {
+        this.sound.play('sfx-click', { volume: 0.5 });
         this.ctx.selectRelic(relic.id);
         this.scene.stop();
         this.scene.resume('Run');

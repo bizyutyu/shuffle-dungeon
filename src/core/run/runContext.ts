@@ -141,6 +141,7 @@ export class RunContext extends TypedEmitter<RunEvents> {
     if (result.isMisfire) {
       // 暴発はダメージを与えられなかった空振りなので、killのタップ数比例計算には含めない
       this.applyImpulseWithRelics('misfire', BASE_IMPULSES.misfire);
+      this.emit('attack:misfire', { enemyId });
       return;
     }
     // ダメージが実際に入ったタップのみをkillインパルスの計算対象にする

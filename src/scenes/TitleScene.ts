@@ -57,6 +57,11 @@ export class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.input.once('pointerdown', () => {
+      // iOS Safariは最初のユーザー操作までAudioContextがsuspendedのままのため、ここで起こす
+      if (this.sound instanceof Phaser.Sound.WebAudioSoundManager) {
+        if (this.sound.context.state === 'suspended') void this.sound.context.resume();
+      }
+      this.sound.play('sfx-click', { volume: 0.5 });
       this.scene.start('Run', { seed: Date.now() });
     });
   }

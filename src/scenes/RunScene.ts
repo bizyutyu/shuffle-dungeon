@@ -5,10 +5,13 @@ import { ZONES, type ZoneId } from '@/core/slider/zones';
 import { DamagePopup } from '@/objects/DamagePopup';
 
 const DAMAGE_POPUP_POOL_SIZE = 8;
+const ENEMY_SCALE = 5;
+const BOSS_SCALE = 10;
 
 export class RunScene extends Phaser.Scene {
   private ctx!: RunContext;
-  private enemySprites = new Map<string, Phaser.GameObjects.Rectangle>();
+  private enemySprites = new Map<string, Phaser.GameObjects.Image>();
+  private playerSprite!: Phaser.GameObjects.Image;
   private damagePopups: DamagePopup[] = [];
   private damagePopupIndex = 0;
   private gameEnded = false;
@@ -30,6 +33,8 @@ export class RunScene extends Phaser.Scene {
       Math.round(amount).toString(),
       isCrit ? '#ffd60a' : '#ffffff',
     );
+    this.sound.play(isCrit ? 'sfx-critical' : 'sfx-attack', { volume: 0.5 });
+    this.flashSprite(sprite);
   };
 
   private readonly onPlayerDamaged = ({ amount }: { amount: number; hp: number }): void => {
@@ -39,21 +44,27 @@ export class RunScene extends Phaser.Scene {
       `-${Math.round(amount)}`,
       '#ff3b30',
     );
+    this.sound.play('sfx-hurt', { volume: 0.5 });
+    this.flashSprite(this.playerSprite);
   };
 
   private readonly onEnemyKilled = ({ id }: { id: string }): void => {
     this.enemySprites.get(id)?.destroy();
     this.enemySprites.delete(id);
+    this.sound.play('sfx-kill', { volume: 0.5 });
+  };
+
+  private readonly onAttackMisfire = (): void => {
+    this.sound.play('sfx-misfire', { volume: 0.4 });
   };
 
   private readonly onAttackBlocked = ({ enemyId }: { enemyId: string }): void => {
     // クールダウン中のタップを「反応がない壊れたUI」に見せないための短いフィードバック
     const sprite = this.enemySprites.get(enemyId);
     if (!sprite) return;
-    const restoreColor = this.ctx.state.isBossFloor ? 0x8a2be2 : 0xaa3333;
-    sprite.setFillStyle(0x555555);
+    sprite.setTint(0x555555);
     this.time.delayedCall(80, () => {
-      if (sprite.active) sprite.setFillStyle(restoreColor);
+      if (sprite.active) sprite.clearTint();
     });
   };
 
@@ -69,6 +80,7 @@ export class RunScene extends Phaser.Scene {
   };
 
   private readonly onFloorCleared = (): void => {
+    this.sound.play('jingle-floor-clear', { volume: 0.6 });
     this.scene.pause();
     this.scene.launch('RelicPick', { ctx: this.ctx });
   };
@@ -81,6 +93,7 @@ export class RunScene extends Phaser.Scene {
 
   private readonly onRunEnded = ({ victory }: { victory: boolean }): void => {
     this.gameEnded = true;
+    this.sound.play(victory ? 'jingle-victory' : 'jingle-game-over', { volume: 0.6 });
     this.scene.start('Result', { ctx: this.ctx, victory });
   };
 
@@ -97,6 +110,8 @@ export class RunScene extends Phaser.Scene {
   create(): void {
     this.scene.launch('Hud', { ctx: this.ctx });
 
+    this.playerSprite = this.add.image(this.scale.width / 2, 920, 'player').setScale(ENEMY_SCALE);
+
     this.damagePopups = Array.from({ length: DAMAGE_POPUP_POOL_SIZE }, () => new DamagePopup(this));
     this.damagePopupIndex = 0;
 
@@ -108,6 +123,7 @@ export class RunScene extends Phaser.Scene {
     this.ctx.on('enemy:damaged', this.onEnemyDamaged);
     this.ctx.on('player:damaged', this.onPlayerDamaged);
     this.ctx.on('attack:blocked', this.onAttackBlocked);
+    this.ctx.on('attack:misfire', this.onAttackMisfire);
     this.ctx.on('slider:zoneEnter', this.onZoneEnter);
     this.ctx.on('floor:cleared', this.onFloorCleared);
     this.ctx.on('floor:started', this.onFloorStarted);
@@ -118,6 +134,7 @@ export class RunScene extends Phaser.Scene {
       this.ctx.off('enemy:damaged', this.onEnemyDamaged);
       this.ctx.off('player:damaged', this.onPlayerDamaged);
       this.ctx.off('attack:blocked', this.onAttackBlocked);
+      this.ctx.off('attack:misfire', this.onAttackMisfire);
       this.ctx.off('slider:zoneEnter', this.onZoneEnter);
       this.ctx.off('floor:cleared', this.onFloorCleared);
       this.ctx.off('floor:started', this.onFloorStarted);
@@ -134,6 +151,13 @@ export class RunScene extends Phaser.Scene {
     return popup;
   }
 
+  private flashSprite(sprite: Phaser.GameObjects.Image): void {
+    sprite.setTint(0xffffff);
+    this.time.delayedCall(60, () => {
+      if (sprite.active) sprite.clearTint();
+    });
+  }
+
   override update(_time: number, delta: number): void {
     if (this.gameEnded) return;
     this.ctx.tick(delta);
@@ -141,18 +165,26 @@ export class RunScene extends Phaser.Scene {
 
   private spawnEnemySprite(enemy: EnemyState): void {
     const isBoss = this.ctx.state.isBossFloor;
-    const size = isBoss ? 160 : 80;
-    const color = isBoss ? 0x8a2be2 : 0xaa3333;
-    const hitPad = isBoss ? 90 : 50;
-    const rect = this.add.rectangle(enemy.x, enemy.y, size, size, color).setInteractive({
-      hitArea: new Phaser.Geom.Rectangle(-hitPad, -hitPad, size + hitPad, size + hitPad),
-      hitAreaCallback: (hitArea: Phaser.Geom.Rectangle, x: number, y: number): boolean =>
-        Phaser.Geom.Rectangle.Contains(hitArea, x, y),
-      useHandCursor: true,
-    });
-    rect.on('pointerdown', () => {
+    const scale = isBoss ? BOSS_SCALE : ENEMY_SCALE;
+    const size = 16 * scale;
+    const hitPad = isBoss ? 40 : 24;
+    const sprite = this.add
+      .image(enemy.x, enemy.y, enemy.spriteKey)
+      .setScale(scale)
+      .setInteractive({
+        hitArea: new Phaser.Geom.Rectangle(
+          -size / 2 - hitPad,
+          -size / 2 - hitPad,
+          size + hitPad * 2,
+          size + hitPad * 2,
+        ),
+        hitAreaCallback: (hitArea: Phaser.Geom.Rectangle, x: number, y: number): boolean =>
+          Phaser.Geom.Rectangle.Contains(hitArea, x, y),
+        useHandCursor: true,
+      });
+    sprite.on('pointerdown', () => {
       if (!this.gameEnded) this.ctx.attackEnemy(enemy.id);
     });
-    this.enemySprites.set(enemy.id, rect);
+    this.enemySprites.set(enemy.id, sprite);
   }
 }

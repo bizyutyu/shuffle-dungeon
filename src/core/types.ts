@@ -16,6 +16,7 @@ export interface EnemyState {
   hp: number;
   maxHp: number;
   atk: number;
+  spriteKey: string;
   x: number;
   y: number;
   alive: boolean;

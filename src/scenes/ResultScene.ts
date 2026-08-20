@@ -78,6 +78,7 @@ export class ResultScene extends Phaser.Scene {
 
     // 「死亡→結果→次のラン開始」を2秒以内に収めるため、タイトルを挟まず直接Runへ
     this.input.once('pointerdown', () => {
+      this.sound.play('sfx-click', { volume: 0.5 });
       this.scene.start('Run', { seed: Date.now() });
     });
   }

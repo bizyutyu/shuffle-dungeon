@@ -28,6 +28,8 @@ export type RunEvents = {
   'player:damaged': { amount: number; hp: number };
   'enemy:killed': { id: string };
   'floor:cleared': { floor: number };
+  'floor:started': { floor: number; isBoss: boolean };
+  'relic:acquired': { id: string };
   'run:ended': { victory: boolean; score: number };
   /** 攻撃クールダウン中のタップが無視されたことをUI側に伝える（無反応に見えるのを防ぐ）。 */
   'attack:blocked': { enemyId: string };

@@ -58,4 +58,9 @@ export class ChaosSlider {
   patchConfig(patch: Partial<SliderConfig>): void {
     Object.assign(this.cfg, patch);
   }
+
+  /** レリック等が現在の設定を読んでから書き換えられるようにするコールバック形式のAPI。 */
+  updateConfig(mutator: (cfg: SliderConfig) => void): void {
+    mutator(this.cfg);
+  }
 }

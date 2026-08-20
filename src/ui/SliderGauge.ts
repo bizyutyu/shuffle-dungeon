@@ -11,13 +11,22 @@ export class SliderGauge extends Phaser.GameObjects.Container {
     this.trackWidth = width;
 
     const bands = scene.add.graphics();
+    this.add(bands);
     for (const zone of ZONES) {
       const x0 = (zone.bounds[0] / 100) * width - width / 2;
       const x1 = (zone.bounds[1] / 100) * width - width / 2;
       bands.fillStyle(zone.colorHex, 0.35);
       bands.fillRect(x0, -20, x1 - x0, 40);
+
+      const label = scene.add
+        .text(x0 + (x1 - x0) / 2, -44, zone.label, {
+          fontFamily: 'monospace',
+          fontSize: '15px',
+          color: `#${zone.colorHex.toString(16).padStart(6, '0')}`,
+        })
+        .setOrigin(0.5);
+      this.add(label);
     }
-    this.add(bands);
 
     this.knob = scene.add.circle(0, 0, 14, 0xffffff);
     this.add(this.knob);

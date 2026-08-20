@@ -16,21 +16,27 @@ export class RunScene extends Phaser.Scene {
     // クールダウン中のタップを「反応がない壊れたUI」に見せないための短いフィードバック
     const sprite = this.enemySprites.get(enemyId);
     if (!sprite) return;
+    const restoreColor = this.ctx.state.isBossFloor ? 0x8a2be2 : 0xaa3333;
     sprite.setFillStyle(0x555555);
     this.time.delayedCall(80, () => {
-      if (sprite.active) sprite.setFillStyle(0xaa3333);
+      if (sprite.active) sprite.setFillStyle(restoreColor);
     });
+  };
+
+  private readonly onFloorCleared = (): void => {
+    this.scene.pause();
+    this.scene.launch('RelicPick', { ctx: this.ctx });
+  };
+
+  private readonly onFloorStarted = (): void => {
+    for (const sprite of this.enemySprites.values()) sprite.destroy();
+    this.enemySprites.clear();
+    for (const enemy of this.ctx.state.enemies) this.spawnEnemySprite(enemy);
   };
 
   private readonly onRunEnded = ({ victory }: { victory: boolean }): void => {
     this.gameEnded = true;
-    this.add
-      .text(this.scale.width / 2, this.scale.height / 2, victory ? 'CLEAR' : 'GAME OVER', {
-        fontFamily: 'monospace',
-        fontSize: '56px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
+    this.scene.start('Result', { ctx: this.ctx, victory });
   };
 
   constructor() {
@@ -51,14 +57,19 @@ export class RunScene extends Phaser.Scene {
     }
 
     this.ctx.on('enemy:killed', this.onEnemyKilled);
-    this.ctx.on('run:ended', this.onRunEnded);
     this.ctx.on('attack:blocked', this.onAttackBlocked);
+    this.ctx.on('floor:cleared', this.onFloorCleared);
+    this.ctx.on('floor:started', this.onFloorStarted);
+    this.ctx.on('run:ended', this.onRunEnded);
 
     this.events.once('shutdown', () => {
       this.ctx.off('enemy:killed', this.onEnemyKilled);
-      this.ctx.off('run:ended', this.onRunEnded);
       this.ctx.off('attack:blocked', this.onAttackBlocked);
+      this.ctx.off('floor:cleared', this.onFloorCleared);
+      this.ctx.off('floor:started', this.onFloorStarted);
+      this.ctx.off('run:ended', this.onRunEnded);
       this.scene.stop('Hud');
+      this.scene.stop('RelicPick');
     });
   }
 
@@ -68,8 +79,12 @@ export class RunScene extends Phaser.Scene {
   }
 
   private spawnEnemySprite(enemy: EnemyState): void {
-    const rect = this.add.rectangle(enemy.x, enemy.y, 80, 80, 0xaa3333).setInteractive({
-      hitArea: new Phaser.Geom.Rectangle(-50, -50, 100, 100),
+    const isBoss = this.ctx.state.isBossFloor;
+    const size = isBoss ? 160 : 80;
+    const color = isBoss ? 0x8a2be2 : 0xaa3333;
+    const hitPad = isBoss ? 90 : 50;
+    const rect = this.add.rectangle(enemy.x, enemy.y, size, size, color).setInteractive({
+      hitArea: new Phaser.Geom.Rectangle(-hitPad, -hitPad, size + hitPad, size + hitPad),
       hitAreaCallback: (hitArea: Phaser.Geom.Rectangle, x: number, y: number): boolean =>
         Phaser.Geom.Rectangle.Contains(hitArea, x, y),
       useHandCursor: true,

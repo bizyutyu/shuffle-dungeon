@@ -1,7 +1,10 @@
 import Phaser from 'phaser';
 import { BootScene } from '@/scenes/BootScene';
+import { TitleScene } from '@/scenes/TitleScene';
 import { RunScene } from '@/scenes/RunScene';
 import { HudScene } from '@/scenes/HudScene';
+import { RelicPickScene } from '@/scenes/RelicPickScene';
+import { ResultScene } from '@/scenes/ResultScene';
 
 export const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -16,5 +19,5 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
   render: { antialias: false, pixelArt: true, roundPixels: true },
   physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 0 }, debug: false } },
   input: { activePointers: 2 },
-  scene: [BootScene, RunScene, HudScene],
+  scene: [BootScene, TitleScene, RunScene, HudScene, RelicPickScene, ResultScene],
 };

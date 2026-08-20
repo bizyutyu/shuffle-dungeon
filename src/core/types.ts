@@ -24,14 +24,18 @@ export interface EnemyState {
 }
 
 export type RunStatus = 'running' | 'won' | 'lost';
+export type FloorPhase = 'combat' | 'cleared';
 
 export interface RunState {
   seed: number;
   floor: number;
+  floorPhase: FloorPhase;
+  isBossFloor: boolean;
   status: RunStatus;
   playerHp: number;
   playerMaxHp: number;
   enemies: EnemyState[];
+  relicIds: string[];
   score: number;
   elapsedSec: number;
 }

@@ -3,9 +3,12 @@ import type { RunContext } from '@/core/run/runContext';
 import { ZONES, zoneAt } from '@/core/slider/zones';
 import { SliderGauge } from '@/ui/SliderGauge';
 
+const HP_BAR_WIDTH = 240;
+
 export class HudScene extends Phaser.Scene {
   private ctx!: RunContext;
   private gauge!: SliderGauge;
+  private hpBarFill!: Phaser.GameObjects.Rectangle;
   private hpText!: Phaser.GameObjects.Text;
   private floorText!: Phaser.GameObjects.Text;
   private modsText!: Phaser.GameObjects.Text;
@@ -27,11 +30,14 @@ export class HudScene extends Phaser.Scene {
       fontSize: '28px',
       color: '#ffffff',
     });
-    this.hpText = this.add.text(20, 56, '', {
+    this.add.rectangle(20, 62, HP_BAR_WIDTH, 18, 0x333344).setOrigin(0, 0.5);
+    this.hpBarFill = this.add.rectangle(20, 62, HP_BAR_WIDTH, 18, 0x30d158).setOrigin(0, 0.5);
+    this.hpText = this.add.text(20 + HP_BAR_WIDTH + 12, 62, '', {
       fontFamily: 'monospace',
-      fontSize: '24px',
+      fontSize: '18px',
       color: '#ffffff',
     });
+    this.hpText.setOrigin(0, 0.5);
 
     this.gauge = new SliderGauge(
       this,
@@ -58,7 +64,15 @@ export class HudScene extends Phaser.Scene {
 
   override update(): void {
     this.floorText.setText(`F${this.ctx.state.floor}/5`);
-    this.hpText.setText(`HP ${Math.ceil(this.ctx.state.playerHp)}/${this.ctx.state.playerMaxHp}`);
+    this.hpText.setText(`${Math.ceil(this.ctx.state.playerHp)}/${this.ctx.state.playerMaxHp}`);
+
+    const hpRatio = Phaser.Math.Clamp(
+      this.ctx.state.playerHp / this.ctx.state.playerMaxHp,
+      0,
+      1,
+    );
+    this.hpBarFill.width = HP_BAR_WIDTH * hpRatio;
+    this.hpBarFill.setFillStyle(hpRatio > 0.5 ? 0x30d158 : hpRatio > 0.25 ? 0xffcc00 : 0xff3b30);
 
     const m = this.ctx.mods;
     const zoneId = zoneAt(this.ctx.slider.value);

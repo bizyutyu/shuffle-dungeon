@@ -148,6 +148,7 @@ export class RunContext extends TypedEmitter<RunEvents> {
     if (result.isCrit) this.applyImpulseWithRelics('critical', BASE_IMPULSES.critical);
 
     enemy.hp = clamp(enemy.hp - result.damage, 0, enemy.maxHp);
+    this.emit('enemy:damaged', { id: enemy.id, amount: result.damage, isCrit: result.isCrit });
     if (enemy.hp <= 0) {
       enemy.alive = false;
       this.applyImpulseWithRelics('kill', killImpulseFor(enemy.taps));

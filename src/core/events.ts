@@ -26,6 +26,7 @@ export type RunEvents = {
   'slider:changed': { value: number; zone: ZoneId };
   'slider:zoneEnter': { zone: ZoneId };
   'player:damaged': { amount: number; hp: number };
+  'enemy:damaged': { id: string; amount: number; isCrit: boolean };
   'enemy:killed': { id: string };
   'floor:cleared': { floor: number };
   'floor:started': { floor: number; isBoss: boolean };

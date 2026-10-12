@@ -365,12 +365,13 @@ export class RunScene extends Phaser.Scene {
 
   private flashSprite(sprite: Phaser.GameObjects.Image): void {
     const enemyTint = this.ctx.currentEnemy.tint;
-    sprite.setTintFill(0xffffff);
+    sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
     this.time.delayedCall(60, () => {
       if (!sprite.active) return;
-      // 色違いの敵は元の色に戻す
+      // setTint は色だけを変えてモードは変えないので、clearTint で MULTIPLY に戻してから、
+      // 色違いの敵は元の色を付け直す（戻さないと白いシルエットのままになる）
+      sprite.clearTint();
       if (sprite === this.enemySprite && enemyTint !== null) sprite.setTint(enemyTint);
-      else sprite.clearTint();
     });
   }
 }

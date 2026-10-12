@@ -11,7 +11,7 @@ https://bizyutyu.github.io/shuffle-dungeon/ （準備中）
 ## 技術スタック
 
 - **Vite + TypeScript**
-- **Phaser 3.90.0**（キャレットなし完全固定）。Phaser 4 が既に安定版だが、チュートリアル・実務事例の蓄積量を優先し 3 系を意図的に選択した
+- **Phaser 4.2.1**（キャレットなし完全固定）。当初はチュートリアル・実務事例の蓄積量を優先して 3 系を選んでいたが、このゲームが使う API の範囲では移行の影響が小さい（`setTintFill` の置き換えのみ）と確認できたため 4 系へ移行した
 - デプロイ: GitHub Pages（GitHub Actions 経由）
 
 ## アーキテクチャ

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { RunContext } from '@/core/run/runContext';
-import { rollRelicChoices } from '@/core/relics/pool';
+import { getRelic } from '@/core/relics/registry';
 import { guardInputBriefly } from '@/ui/inputGuard';
 
 export class RelicPickScene extends Phaser.Scene {
@@ -22,14 +22,14 @@ export class RelicPickScene extends Phaser.Scene {
 
     this.add.rectangle(w / 2, h / 2, w, h, 0x000000, 0.75);
     this.add
-      .text(w / 2, h * 0.18, 'CHOOSE A RELIC', {
+      .text(w / 2, h * 0.18, 'レリックをえらぶ', {
         fontFamily: 'monospace',
         fontSize: '32px',
         color: '#ffffff',
       })
       .setOrigin(0.5);
 
-    const choices = rollRelicChoices(this.ctx.state.relicIds, this.ctx.rng.loot, 3);
+    const choices = this.ctx.state.relicChoices.map(getRelic);
     const cardHeight = 220;
     const startY = h * 0.32;
 
@@ -49,7 +49,7 @@ export class RelicPickScene extends Phaser.Scene {
         .setOrigin(0.5);
 
       this.add
-        .text(w / 2, y + 10, relic.describe(this.ctx), {
+        .text(w / 2, y + 10, relic.description, {
           fontFamily: 'monospace',
           fontSize: '18px',
           color: '#c0c0d0',

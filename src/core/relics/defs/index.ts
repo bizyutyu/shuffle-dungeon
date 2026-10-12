@@ -1,7 +1,9 @@
 // 全レリックをここでimportし、defineRelic()の副作用でレジストリに登録する。
-export { unstableCore } from '@/core/relics/defs/unstableCore';
-export { bloodPendant } from '@/core/relics/defs/bloodPendant';
-export { coldCompress } from '@/core/relics/defs/coldCompress';
 export { ironHeart } from '@/core/relics/defs/ironHeart';
-export { swiftBoots } from '@/core/relics/defs/swiftBoots';
-export { huntersInstinct } from '@/core/relics/defs/huntersInstinct';
+export { manaSpring } from '@/core/relics/defs/manaSpring';
+export { powerBracer } from '@/core/relics/defs/powerBracer';
+export { guardShield } from '@/core/relics/defs/guardShield';
+export { sageCirclet } from '@/core/relics/defs/sageCirclet';
+export { fightersGlove } from '@/core/relics/defs/fightersGlove';
+export { grimoire } from '@/core/relics/defs/grimoire';
+export { thriftRing } from '@/core/relics/defs/thriftRing';

@@ -1,19 +1,26 @@
 import Phaser from 'phaser';
 import type { RunContext } from '@/core/run/runContext';
+import { MAX_TURNS_PER_BATTLE } from '@/core/balance';
 import { loadHighScore, saveHighScoreIfBetter } from '@/data/storage';
 import { guardInputBriefly } from '@/ui/inputGuard';
+import { TOTAL_PHASES } from '@/core/combat/roster';
+import type { EndReason } from '@/core/types';
+
+const END_MESSAGES: Record<EndReason, string> = {
+  cleared: 'すべての敵をたおした！',
+  defeated: 'ちからつきた…',
+  timeout: `${MAX_TURNS_PER_BATTLE}ターンで決着がつかなかった…`,
+};
 
 export class ResultScene extends Phaser.Scene {
   private ctx!: RunContext;
-  private victory = false;
 
   constructor() {
     super('Result');
   }
 
-  init(data: { ctx: RunContext; victory: boolean }): void {
+  init(data: { ctx: RunContext }): void {
     this.ctx = data.ctx;
-    this.victory = data.victory;
   }
 
   create(): void {
@@ -21,14 +28,23 @@ export class ResultScene extends Phaser.Scene {
 
     const w = this.scale.width;
     const h = this.scale.height;
-    const score = Math.round(this.ctx.state.score);
+    const { state } = this.ctx;
+    const score = state.score;
     const isNewHigh = saveHighScoreIfBetter(score);
 
     this.add
-      .text(w / 2, h * 0.22, this.victory ? 'CLEAR' : 'GAME OVER', {
+      .text(w / 2, h * 0.2, state.status === 'won' ? 'CLEAR' : 'GAME OVER', {
         fontFamily: 'monospace',
         fontSize: '52px',
         color: '#ffffff',
+      })
+      .setOrigin(0.5);
+
+    this.add
+      .text(w / 2, h * 0.27, END_MESSAGES[state.endReason ?? 'defeated'], {
+        fontFamily: 'monospace',
+        fontSize: '22px',
+        color: '#c0c0d0',
       })
       .setOrigin(0.5);
 
@@ -41,9 +57,9 @@ export class ResultScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const lines = [
-      `FLOOR    ${this.ctx.state.floor}/5`,
-      `RELICS   ${this.ctx.state.relicIds.length}`,
-      `SEED     ${this.ctx.state.seed}`,
+      `フェーズ  ${state.phase}/${TOTAL_PHASES}`,
+      `レリック  ${state.relicIds.length}`,
+      `シード    ${state.seed}`,
     ];
     this.add
       .text(w / 2, h * 0.48, lines.join('\n'), {
@@ -56,16 +72,11 @@ export class ResultScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(
-        w / 2,
-        h * 0.62,
-        isNewHigh ? 'NEW HIGH SCORE!' : `HIGH SCORE  ${Math.round(loadHighScore())}`,
-        {
-          fontFamily: 'monospace',
-          fontSize: '20px',
-          color: isNewHigh ? '#ffd60a' : '#8e8e93',
-        },
-      )
+      .text(w / 2, h * 0.62, isNewHigh ? 'NEW HIGH SCORE!' : `HIGH SCORE  ${loadHighScore()}`, {
+        fontFamily: 'monospace',
+        fontSize: '20px',
+        color: isNewHigh ? '#ffd60a' : '#8e8e93',
+      })
       .setOrigin(0.5);
 
     this.add
@@ -76,10 +87,10 @@ export class ResultScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // 「死亡→結果→次のラン開始」を2秒以内に収めるため、タイトルを挟まず直接Runへ
+    // すぐ次のランを始められるよう、タイトルを挟まず直接ぼうけんじゅんびへ
     this.input.once('pointerdown', () => {
       this.sound.play('sfx-click', { volume: 0.5 });
-      this.scene.start('Run', { seed: Date.now() });
+      this.scene.start('Prep', { seed: Date.now() });
     });
   }
 }

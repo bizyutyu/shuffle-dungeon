@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'shuffle-dungeon:highscore';
-const SCHEMA_VERSION = 1;
+// v2: ターン制への再設計でスコアの基準が変わったため、v1の記録は読み込まない
+const SCHEMA_VERSION = 2;
 
 interface StoredHighScore {
   version: number;
@@ -13,7 +14,9 @@ function isStoredHighScore(data: unknown): data is StoredHighScore {
     'version' in data &&
     'score' in data &&
     (data as { version: unknown }).version === SCHEMA_VERSION &&
-    typeof (data as { score: unknown }).score === 'number'
+    // 改ざんされた Infinity・負数・小数で表示が崩れたり、以後更新できなくなったりしないようにする
+    Number.isSafeInteger((data as { score: unknown }).score) &&
+    (data as { score: number }).score >= 0
   );
 }
 

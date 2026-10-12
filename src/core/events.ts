@@ -1,4 +1,4 @@
-import type { ZoneId } from '@/core/slider/zones';
+import type { CombatantId, EndReason, TurnResult } from '@/core/types';
 
 type Listener<T> = (payload: T) => void;
 
@@ -23,16 +23,10 @@ export class TypedEmitter<E extends Record<string, unknown>> {
 }
 
 export type RunEvents = {
-  'slider:changed': { value: number; zone: ZoneId };
-  'slider:zoneEnter': { zone: ZoneId };
-  'player:damaged': { amount: number; hp: number };
-  'enemy:damaged': { id: string; amount: number; isCrit: boolean };
-  'enemy:killed': { id: string };
-  'floor:cleared': { floor: number };
-  'floor:started': { floor: number; isBoss: boolean };
+  'prep:shuffled': { shufflesLeft: number };
+  'battle:started': { phase: number; enemyId: CombatantId };
+  'turn:resolved': TurnResult;
+  'battle:won': { phase: number };
   'relic:acquired': { id: string };
-  'run:ended': { victory: boolean; score: number };
-  /** 攻撃クールダウン中のタップが無視されたことをUI側に伝える（無反応に見えるのを防ぐ）。 */
-  'attack:blocked': { enemyId: string };
-  'attack:misfire': { enemyId: string };
+  'run:ended': { victory: boolean; reason: EndReason; score: number };
 };

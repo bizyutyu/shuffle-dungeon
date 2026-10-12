@@ -1,231 +1,154 @@
-import type { Modifiers, RunState } from '@/core/types';
+import type {
+  ActionId,
+  CombatProfile,
+  Combatant,
+  EndReason,
+  RunState,
+  TurnResult,
+} from '@/core/types';
 import { createRunRng, type RunRng } from '@/core/rng';
-import { clamp } from '@/core/math';
-import { ChaosSlider } from '@/core/slider/chaosSlider';
-import {
-  BASE_IMPULSES,
-  killImpulseFor,
-  type ImpulseSource,
-  type ImpulseSpec,
-} from '@/core/slider/impulse';
-import { zoneAt, type ZoneId } from '@/core/slider/zones';
-import { zoneModsAt } from '@/core/stats/resolve';
-import { createEnemy } from '@/core/combat/enemy';
-import { resolvePlayerAttack, resolveEnemyDamageToPlayer } from '@/core/combat/damage';
+import { MAX_SHUFFLES, MAX_TURNS_PER_BATTLE, RELIC_CHOICE_COUNT } from '@/core/balance';
+import { baseProfile, createCombatant, restoreFully } from '@/core/combat/combatant';
+import { ENEMY_DEFS, PLAYER_DEF, TOTAL_PHASES } from '@/core/combat/roster';
+import { canUse, resolveTurn, type BattleSide } from '@/core/combat/turn';
+import { shuffleWorld } from '@/core/stats/shuffle';
 import { TypedEmitter, type RunEvents } from '@/core/events';
-import { planFloor } from '@/core/run/floorPlan';
-import { scoreDelta } from '@/core/run/score';
-import { getRelic } from '@/core/relics/registry';
+import { computeScore } from '@/core/run/score';
+import { profileWithRelics } from '@/core/relics/apply';
+import { rollRelicChoices } from '@/core/relics/pool';
 import '@/core/relics/defs'; // 副作用: 全レリックをレジストリに登録する
 
-const FIXED_STEP_MS = 1000 / 60;
-// タブが非アクティブだった場合等の巨大なdtで1フレームに大量のステップが走るのを防ぐ
-const MAX_ACCUMULATOR_MS = 250;
-const BASE_ATTACK_COOLDOWN_SEC = 0.35;
-const ENEMY_ATTACK_INTERVAL_SEC = 1.5;
-
+/**
+ * 1ラン分の状態を持ち、コマンド（shuffle / depart / act / selectRelic）を受けて進める。
+ * 各コマンドは今のステップで受け付けられないときは何もせず false / null を返す。
+ */
 export class RunContext extends TypedEmitter<RunEvents> {
   readonly state: RunState;
-  readonly slider: ChaosSlider;
   readonly rng: RunRng;
-  mods: Modifiers;
-  private accumulatorMs = 0;
-  private lastZone: ZoneId;
-  private lastPlayerAttackAtSec = -Infinity;
 
   constructor(seed: number) {
     super();
     this.rng = createRunRng(seed);
-    this.slider = new ChaosSlider(this.rng.slider);
-
-    const plan = planFloor(1);
     this.state = {
       seed,
-      floor: 1,
-      floorPhase: 'combat',
-      isBossFloor: plan.isBoss,
+      step: 'prep',
       status: 'running',
-      playerHp: 100,
-      playerMaxHp: 100,
-      enemies: spawnEnemies(plan, 1, 0),
+      endReason: null,
+      phase: 1,
+      turn: 0,
+      shufflesLeft: MAX_SHUFFLES,
+      player: createCombatant(PLAYER_DEF),
+      enemies: ENEMY_DEFS.map(createCombatant),
       relicIds: [],
+      relicChoices: [],
       score: 0,
-      elapsedSec: 0,
     };
-    this.mods = this.resolveMods();
-    this.lastZone = zoneAt(this.slider.value);
   }
 
-  /** 可変フレームレートの影響を排除するため、常に固定ステップでcoreを進める。 */
-  tick(dtMs: number): void {
-    if (this.state.status !== 'running' || this.state.floorPhase !== 'combat') return;
-    this.accumulatorMs = Math.min(this.accumulatorMs + dtMs, MAX_ACCUMULATOR_MS);
-    while (this.accumulatorMs >= FIXED_STEP_MS) {
-      this.fixedTick(FIXED_STEP_MS);
-      this.accumulatorMs -= FIXED_STEP_MS;
-      if (this.state.status !== 'running' || this.state.floorPhase !== 'combat') break;
-    }
+  get currentEnemy(): Combatant {
+    const enemy = this.state.enemies[this.state.phase - 1];
+    if (!enemy) throw new Error(`no enemy for phase ${this.state.phase}`);
+    return enemy;
   }
 
-  private fixedTick(dtMs: number): void {
-    // 通常のゲームプレイでは到達しないが、テスト等で外部からHPを直接操作された場合、
-    // CHAOS帯のhpRegenで復活してしまう前にここで確定させる（防御的ガード）。
-    if (this.state.playerHp <= 0) {
-      this.endRun(false);
-      return;
-    }
-
-    this.slider.update(dtMs);
-    this.mods = this.resolveMods();
-
-    const dtSec = dtMs / 1000;
-    this.state.elapsedSec += dtSec;
-    this.state.score += scoreDelta(dtSec, this.slider.value, this.state.floor);
-    this.state.playerHp = clamp(
-      this.state.playerHp + this.mods.hpRegenPerSec * dtSec,
-      0,
-      this.state.playerMaxHp,
-    );
-    if (this.state.playerHp <= 0) {
-      this.endRun(false);
-      return;
-    }
-
-    this.tickEnemyAttacks();
-    if (this.state.status !== 'running') return;
-
-    const zone = zoneAt(this.slider.value);
-    if (zone !== this.lastZone) {
-      this.lastZone = zone;
-      this.emit('slider:zoneEnter', { zone });
-    }
-    this.emit('slider:changed', { value: this.slider.value, zone });
+  playerProfile(): CombatProfile {
+    return profileWithRelics(this.state.player.points, this.state.relicIds);
   }
 
-  /** 敵はプレイヤーの行動とは無関係に、一定間隔で自律的に攻撃してくる。 */
-  private tickEnemyAttacks(): void {
-    const interval = ENEMY_ATTACK_INTERVAL_SEC / this.mods.enemySpeedMul;
-    for (const enemy of this.state.enemies) {
-      if (!enemy.alive) continue;
-      if (this.state.elapsedSec - enemy.lastAttackAtSec < interval) continue;
-      enemy.lastAttackAtSec += interval;
-
-      const dmg = resolveEnemyDamageToPlayer(enemy.atk, this.mods);
-      this.state.playerHp = clamp(this.state.playerHp - dmg, 0, this.state.playerMaxHp);
-      this.applyImpulseWithRelics('takeDamage', BASE_IMPULSES.takeDamage);
-      this.emit('player:damaged', { amount: dmg, hp: this.state.playerHp });
-      if (this.state.playerHp <= 0) {
-        this.endRun(false);
-        return;
-      }
-    }
+  enemyProfile(enemy: Combatant = this.currentEnemy): CombatProfile {
+    return baseProfile(enemy.points);
   }
 
-  attackEnemy(enemyId: string): void {
-    if (this.state.status !== 'running' || this.state.floorPhase !== 'combat') return;
-
-    const enemy = this.state.enemies.find((e) => e.id === enemyId && e.alive);
-    if (!enemy) return;
-
-    // atkSpeedMulに応じたクールダウン。CHAOSでは連打できず、AGGRESSIVEでは連射できる。
-    const cooldownSec = BASE_ATTACK_COOLDOWN_SEC / this.mods.atkSpeedMul;
-    if (this.state.elapsedSec - this.lastPlayerAttackAtSec < cooldownSec) {
-      this.emit('attack:blocked', { enemyId });
-      return;
-    }
-
-    this.lastPlayerAttackAtSec = this.state.elapsedSec;
-    this.applyImpulseWithRelics('attack', BASE_IMPULSES.attack);
-    const result = resolvePlayerAttack(this.mods, this.rng.combat);
-
-    if (result.isMisfire) {
-      // 暴発はダメージを与えられなかった空振りなので、killのタップ数比例計算には含めない
-      this.applyImpulseWithRelics('misfire', BASE_IMPULSES.misfire);
-      this.emit('attack:misfire', { enemyId });
-      return;
-    }
-    // ダメージが実際に入ったタップのみをkillインパルスの計算対象にする
-    enemy.taps += 1;
-    if (result.isCrit) this.applyImpulseWithRelics('critical', BASE_IMPULSES.critical);
-
-    enemy.hp = clamp(enemy.hp - result.damage, 0, enemy.maxHp);
-    this.emit('enemy:damaged', { id: enemy.id, amount: result.damage, isCrit: result.isCrit });
-    if (enemy.hp <= 0) {
-      enemy.alive = false;
-      this.applyImpulseWithRelics('kill', killImpulseFor(enemy.taps));
-      for (const relicId of this.state.relicIds) {
-        getRelic(relicId).hooks.onKill?.(this, enemy.id);
-      }
-      this.emit('enemy:killed', { id: enemy.id });
-      if (this.state.enemies.every((e) => !e.alive)) {
-        this.onFloorCleared();
-      }
-    }
+  /** プレイヤーが今使える行動。MPが足りないまほうは含まない。 */
+  usableActionIds(): ActionId[] {
+    const side = this.playerSide();
+    return side.combatant.actions.filter((s) => canUse(s, side)).map((s) => s.id);
   }
 
-  private onFloorCleared(): void {
-    if (this.state.isBossFloor) {
-      this.endRun(true);
-      return;
-    }
-    this.state.floorPhase = 'cleared';
-    this.emit('floor:cleared', { floor: this.state.floor });
+  /** ぼうけんじゅんび: 全員の素点と行動の対象を配り直す。 */
+  shuffle(): boolean {
+    if (this.state.step !== 'prep' || this.state.shufflesLeft <= 0) return false;
+    shuffleWorld([this.state.player, ...this.state.enemies], this.rng.shuffle);
+    this.state.shufflesLeft -= 1;
+    // 配り直しで最大値が変わるので、準備画面で見せる現在値も合わせる
+    restoreFully(this.state.player, this.playerProfile());
+    for (const enemy of this.state.enemies) restoreFully(enemy, this.enemyProfile(enemy));
+    this.emit('prep:shuffled', { shufflesLeft: this.state.shufflesLeft });
+    return true;
   }
 
-  /** レリックを1つ取得し、次のフロアへ進む。floorPhaseが'cleared'のときのみ有効。 */
-  selectRelic(relicId: string): void {
-    if (this.state.floorPhase !== 'cleared') return;
-    const def = getRelic(relicId);
+  depart(): boolean {
+    if (this.state.step !== 'prep') return false;
+    this.startBattle(1);
+    return true;
+  }
+
+  act(actionId: ActionId): TurnResult | null {
+    if (this.state.step !== 'battle') return null;
+    const player = this.playerSide();
+    const slot = player.combatant.actions.find((s) => s.id === actionId);
+    if (!slot || !canUse(slot, player)) return null;
+
+    this.state.turn += 1;
+    const result = resolveTurn(player, this.enemySide(), actionId, this.rng.enemyAi);
+    this.emit('turn:resolved', result);
+
+    if (result.winner === 'enemy') {
+      this.endRun('defeated');
+    } else if (result.winner === 'player') {
+      this.onBattleWon();
+    } else if (this.state.turn >= MAX_TURNS_PER_BATTLE) {
+      this.endRun('timeout');
+    }
+    return result;
+  }
+
+  selectRelic(relicId: string): boolean {
+    if (this.state.step !== 'relic' || !this.state.relicChoices.includes(relicId)) return false;
     this.state.relicIds.push(relicId);
-    this.slider.updateConfig((cfg) => def.hooks.modifySliderConfig?.(cfg, this));
-    def.hooks.onAcquire?.(this);
+    this.state.relicChoices = [];
     this.emit('relic:acquired', { id: relicId });
-    this.advanceFloor();
+    this.startBattle(this.state.phase + 1);
+    return true;
   }
 
-  private advanceFloor(): void {
-    const nextFloor = this.state.floor + 1;
-    const plan = planFloor(nextFloor);
-    this.state.floor = nextFloor;
-    this.state.isBossFloor = plan.isBoss;
-    this.state.enemies = spawnEnemies(plan, nextFloor, this.state.elapsedSec);
-    this.state.floorPhase = 'combat';
-    for (const relicId of this.state.relicIds) {
-      getRelic(relicId).hooks.onFloorStart?.(this, nextFloor);
+  private playerSide(): BattleSide {
+    return { combatant: this.state.player, profile: this.playerProfile() };
+  }
+
+  private enemySide(): BattleSide {
+    return { combatant: this.currentEnemy, profile: this.enemyProfile() };
+  }
+
+  private startBattle(phase: number): void {
+    this.state.phase = phase;
+    this.state.turn = 0;
+    this.state.step = 'battle';
+    restoreFully(this.state.player, this.playerProfile());
+    restoreFully(this.currentEnemy, this.enemyProfile());
+    this.emit('battle:started', { phase, enemyId: this.currentEnemy.id });
+  }
+
+  private onBattleWon(): void {
+    this.emit('battle:won', { phase: this.state.phase });
+    if (this.state.phase >= TOTAL_PHASES) {
+      this.endRun('cleared');
+      return;
     }
-    this.emit('floor:started', { floor: nextFloor, isBoss: plan.isBoss });
+    this.state.step = 'relic';
+    this.state.relicChoices = rollRelicChoices(
+      this.state.relicIds,
+      this.rng.loot,
+      RELIC_CHOICE_COUNT,
+    ).map((r) => r.id);
   }
 
-  private resolveMods(): Modifiers {
-    const mods = zoneModsAt(this.slider.value);
-    for (const relicId of this.state.relicIds) {
-      getRelic(relicId).hooks.modifyStats?.(mods, this);
-    }
-    return mods;
-  }
-
-  private applyImpulseWithRelics(source: ImpulseSource, base: ImpulseSpec): void {
-    const spec: ImpulseSpec = { ...base };
-    for (const relicId of this.state.relicIds) {
-      getRelic(relicId).hooks.modifyImpulse?.(spec, source, this);
-    }
-    this.slider.applyImpulse(spec);
-  }
-
-  private endRun(victory: boolean): void {
+  private endRun(reason: EndReason): void {
+    const victory = reason === 'cleared';
+    this.state.step = 'ended';
     this.state.status = victory ? 'won' : 'lost';
-    this.emit('run:ended', { victory, score: this.state.score });
+    this.state.endReason = reason;
+    this.state.score = computeScore(this.state.phase, victory);
+    this.emit('run:ended', { victory, reason, score: this.state.score });
   }
-}
-
-function spawnEnemies(plan: ReturnType<typeof planFloor>, floor: number, nowSec: number) {
-  const enemies = plan.enemyDefs.map((def, i) => {
-    const pos = plan.positions[i] ?? [360, 600];
-    return createEnemy(`f${floor}_e${i}`, pos[0], pos[1], def);
-  });
-  // 全員が同時に初回攻撃をしないよう、攻撃タイミングを分散させる
-  enemies.forEach((e, i) => {
-    e.lastAttackAtSec = nowSec + (i / enemies.length) * ENEMY_ATTACK_INTERVAL_SEC;
-  });
-  return enemies;
 }

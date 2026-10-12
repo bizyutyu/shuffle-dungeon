@@ -1,10 +1,10 @@
-/** スライダーが50から離れているほど1.0に近づくV字の危険度重み。 */
-export function dangerWeight(sliderValue: number): number {
-  const dist = Math.abs(sliderValue - 50) / 50; // 0(中央)..1(端)
-  return Math.pow(dist, 1.5);
-}
+import { TOTAL_PHASES } from '@/core/combat/roster';
 
-/** 経過時間・スライダー位置・フロアの深さから危険度スコアの増分を求める。 */
-export function scoreDelta(dtSec: number, sliderValue: number, floor: number): number {
-  return dtSec * dangerWeight(sliderValue) * (1 + floor * 0.4) * 10;
+const POINTS_PER_PHASE = 1000;
+const VICTORY_BONUS = 5000;
+
+/** 到達フェーズ × 1000 ＋ 勝利ボーナス。 */
+export function computeScore(phaseReached: number, victory: boolean): number {
+  const phase = Math.min(Math.max(phaseReached, 0), TOTAL_PHASES);
+  return phase * POINTS_PER_PHASE + (victory ? VICTORY_BONUS : 0);
 }

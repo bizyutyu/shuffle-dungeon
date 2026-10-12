@@ -4,11 +4,11 @@ export const ironHeart = defineRelic({
   id: 'iron_heart',
   name: '鉄の心臓',
   rarity: 'common',
-  tags: ['defense'],
-  describe: () => '被ダメージが常に25%軽減される。',
+  tags: ['stat'],
+  description: 'たいりょくの最大値 +15',
   hooks: {
-    modifyStats(mods) {
-      mods.damageTakenMul *= 0.75;
+    modifyStats(stats) {
+      stats.maxHp += 15;
     },
   },
 });

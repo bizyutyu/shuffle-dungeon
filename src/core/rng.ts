@@ -23,18 +23,30 @@ export class Rng {
     if (item === undefined) throw new Error('Rng.pick: empty array');
     return item;
   }
+
+  /** Fisher–Yates で新しい配列を返す（元の配列は変更しない）。 */
+  shuffle<T>(arr: readonly T[]): T[] {
+    const result = [...arr];
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(this.next() * (i + 1));
+      const a = result[i] as T;
+      result[i] = result[j] as T;
+      result[j] = a;
+    }
+    return result;
+  }
 }
 
 export interface RunRng {
-  combat: Rng;
-  slider: Rng;
+  shuffle: Rng;
+  enemyAi: Rng;
   loot: Rng;
 }
 
 export function createRunRng(seed: number): RunRng {
   return {
-    combat: new Rng(seed ^ 0x1111_1111),
-    slider: new Rng(seed ^ 0x2222_2222),
+    shuffle: new Rng(seed ^ 0x1111_1111),
+    enemyAi: new Rng(seed ^ 0x2222_2222),
     loot: new Rng(seed ^ 0x3333_3333),
   };
 }

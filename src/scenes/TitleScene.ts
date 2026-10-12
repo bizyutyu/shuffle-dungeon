@@ -3,11 +3,11 @@ import { loadHighScore } from '@/data/storage';
 import { guardInputBriefly } from '@/ui/inputGuard';
 
 const RULES = [
-  '下のスライダーが今の強さを決める',
-  'タップで攻撃するたびスライダーが揺れる',
-  '左寄り: 攻撃力UP / 被ダメ2倍',
-  '右寄り: HP自動回復 / 攻撃が遅くなる',
-  '敵は放っておいても一定間隔で攻撃してくる',
+  '5体の敵と、1体ずつターン制で戦う',
+  '出発前にシャッフルすると',
+  '全員のステータスが配り直され',
+  '行動の対象（じぶん/あいて）も入れ替わる',
+  'たおすたびにレリックを1つ得る',
 ];
 
 export class TitleScene extends Phaser.Scene {
@@ -41,7 +41,7 @@ export class TitleScene extends Phaser.Scene {
 
     const highScore = loadHighScore();
     this.add
-      .text(w / 2, h * 0.62, `HIGH SCORE  ${Math.round(highScore)}`, {
+      .text(w / 2, h * 0.62, `HIGH SCORE  ${highScore}`, {
         fontFamily: 'monospace',
         fontSize: '20px',
         color: '#8e8e93',
@@ -62,7 +62,7 @@ export class TitleScene extends Phaser.Scene {
         if (this.sound.context.state === 'suspended') void this.sound.context.resume();
       }
       this.sound.play('sfx-click', { volume: 0.5 });
-      this.scene.start('Run', { seed: Date.now() });
+      this.scene.start('Prep', { seed: Date.now() });
     });
   }
 }

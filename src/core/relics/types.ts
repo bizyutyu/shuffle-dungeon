@@ -1,21 +1,16 @@
-import type { Modifiers } from '@/core/types';
-import type { RunContext } from '@/core/run/runContext';
-import type { ImpulseSource, ImpulseSpec } from '@/core/slider/impulse';
-import type { SliderConfig } from '@/core/slider/chaosSlider';
+import type { ActionKind, Stats } from '@/core/types';
 
 export type Rarity = 'common' | 'rare' | 'legendary';
-export type RelicTag = 'slider' | 'offense' | 'defense' | 'loot' | 'risk';
+export type RelicTag = 'stat' | 'kakutou' | 'mahou';
 
+/** レリックはプレイヤーの戦闘能力にだけ作用する。 */
 export interface RelicHooks {
-  /** 最終ステータス解決時。modsを直接ミューテートする。 */
-  modifyStats?(mods: Modifiers, ctx: RunContext): void;
-  /** スライダーへのインパルス発生時。specを書き換えて揺れ方を変える。 */
-  modifyImpulse?(spec: ImpulseSpec, source: ImpulseSource, ctx: RunContext): void;
-  /** 取得時にスライダーの物理特性そのものを変える。 */
-  modifySliderConfig?(cfg: SliderConfig, ctx: RunContext): void;
-  onAcquire?(ctx: RunContext): void;
-  onFloorStart?(ctx: RunContext, floor: number): void;
-  onKill?(ctx: RunContext, enemyId: string): void;
+  /** すばやさ以外のステータスに加算する。statsを直接書き換える。 */
+  modifyStats?(stats: Stats): void;
+  /** かくとう／まほうの倍率に掛ける係数を返す。 */
+  powerMultiplier?(kind: ActionKind): number;
+  /** まほうの消費MPへの加算値を返す（負で軽減）。 */
+  mpCostDelta?(): number;
 }
 
 export interface RelicDef {
@@ -25,6 +20,6 @@ export interface RelicDef {
   readonly tags: readonly RelicTag[];
   /** 排他グループ。同グループは1つしか出さない。 */
   readonly exclusiveGroup?: string;
-  describe(ctx: RunContext): string;
+  readonly description: string;
   readonly hooks: RelicHooks;
 }

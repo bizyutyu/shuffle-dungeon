@@ -3,7 +3,7 @@ import { BootScene } from '@/scenes/BootScene';
 import { PreloadScene } from '@/scenes/PreloadScene';
 import { TitleScene } from '@/scenes/TitleScene';
 import { RunScene } from '@/scenes/RunScene';
-import { HudScene } from '@/scenes/HudScene';
+import { PrepScene } from '@/scenes/PrepScene';
 import { RelicPickScene } from '@/scenes/RelicPickScene';
 import { ResultScene } from '@/scenes/ResultScene';
 
@@ -20,5 +20,5 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
   render: { antialias: false, pixelArt: true, roundPixels: true },
   physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 0 }, debug: false } },
   input: { activePointers: 2 },
-  scene: [BootScene, PreloadScene, TitleScene, RunScene, HudScene, RelicPickScene, ResultScene],
+  scene: [BootScene, PreloadScene, TitleScene, PrepScene, RunScene, RelicPickScene, ResultScene],
 };
